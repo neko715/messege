@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>手書きストックボード</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background-color: white;
+    }
+
+    canvas {
+      display: block;
+      background-color: white;
+      cursor: crosshair;
+    }
+
+    #enterBtn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 12px 24px;
+      background-color: red;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      z-index: 10;
+    }
+
+    #stockContainer {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      z-index: 5;
+    }
+
+    .stockItem {
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="canvas"></canvas>
+  <div id="stockContainer"></div>
+  <button id="enterBtn">Enter</button>
+
+  <script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const stockContainer = document.getElementById("stockContainer");
+    const enterBtn = document.getElementById("enterBtn");
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+
+    let isDrawing = false;
+
+    canvas.addEventListener("mousedown", (e) => {
+      isDrawing = true;
+      ctx.beginPath();
+      ctx.moveTo(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener("mousemove", (e) => {
+      if (isDrawing) {
+        ctx.lineTo(e.offsetX, e.offsetY);
+        ctx.stroke();
+      }
+    });
+
+    canvas.addEventListener("mouseup", () => {
+      isDrawing = false;
+    });
+
+    canvas.addEventListener("mouseleave", () => {
+      isDrawing = false;
+    });
+
+    // タッチ対応
+    canvas.addEventListener("touchstart", (e) => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      ctx.beginPath();
+      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      isDrawing = true;
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      e.preventDefault();
+      if (!isDrawing) return;
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
+      ctx.stroke();
+    });
+
+    canvas.addEventListener("touchend", () => {
+      isDrawing = false;
+    });
+
+    // Enterボタンで保存＆クリア
+    enterBtn.addEventListener("click", () => {
+      const img = new Image();
+      img.src = canvas.toDataURL();
+      img.width = 100;
+      img.className = "stockItem";
+      stockContainer.appendChild(img);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+  </script>
+</body>
+</html>
