@@ -5,27 +5,149 @@
   <title>商品一覧コードエディタ</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
-    textarea { width: 100%; height: 200px; font-family: monospace; margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; background: #fff; }
-    th, td { padding: 8px; border: 1px solid #ccc; text-align: center; }
-    input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
-    button { padding: 6px 12px; margin: 4px; }
-    #output { width: 100%; height: 300px; font-family: monospace; }
-    .flex { display: flex; gap: 20px; flex-wrap: wrap; }
-    .flex > div { flex: 1 1 400px; }
+    /* リセット＆ベース */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'ヒラギノ角ゴ Pro','メイリオ',sans-serif;
+      background: #eef2f5;
+      color: #333;
+      line-height: 1.5;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 24px;
+      font-size: 1.8em;
+      color: #444;
+    }
+    h2 {
+      margin-bottom: 12px;
+      font-size: 1.2em;
+      color: #555;
+    }
+
+    /* レイアウト */
+    #sourceCode, #output {
+      width: 100%;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: monospace;
+      resize: vertical;
+      background: #fafafa;
+    }
+    #sourceCode { height: 180px; }
+    #output { height: 260px; }
+
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    .panel {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 16px;
+      flex: 1 1 480px;
+    }
+
+    /* テーブル */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+    }
+    th, td {
+      padding: 10px;
+      text-align: center;
+      border-bottom: 1px solid #ddd;
+    }
+    thead th {
+      background: #f4f6f8;
+      font-weight: 600;
+    }
+    tbody tr:nth-child(odd) {
+      background: #fbfcfd;
+    }
+    tbody tr:hover {
+      background: #e8f0fa;
+    }
+    input[type="text"],
+    input[type="number"] {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    input[type="checkbox"] {
+      transform: scale(1.2);
+      margin: 0;
+    }
+
+    /* ボタン */
+    button {
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 14px;
+      font-size: 0.9em;
+      transition: background .2s, transform .1s;
+    }
+    button:hover {
+      transform: translateY(-1px);
+    }
+    #btnAdd {
+      background: #5cb85c;
+      color: #fff;
+    }
+    #btnAdd:hover {
+      background: #4cae4c;
+    }
+    #btnOK {
+      background: #0275d8;
+      color: #fff;
+      width: 100%;
+      max-width: 200px;
+      display: block;
+      margin: 0 auto;
+      margin-top: 10px;
+    }
+    #btnOK:hover {
+      background: #025aa5;
+    }
+    .btnDel {
+      background: #d9534f;
+      color: #fff;
+      padding: 6px 10px;
+    }
+    .btnDel:hover {
+      background: #c9302c;
+    }
+
+    /* ラベル */
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 500;
+      color: #666;
+    }
+
+    /* 小スマホ対応 */
+    @media (max-width: 600px) {
+      .container { flex-direction: column; }
+    }
   </style>
 </head>
 <body>
   <h1>商品一覧コードエディタ</h1>
 
-  <!-- 元コード入力 -->
-  <label>① ここに元のHTMLコードを貼り付け：</label>
+  <label for="sourceCode">① 元のHTMLコードをここに貼り付け</label>
   <textarea id="sourceCode" placeholder="ここに元のHTMLを貼り付けてください"></textarea>
 
-  <!-- 編集用UI -->
-  <div class="flex">
-    <div>
+  <div class="container">
+    <div class="panel">
       <h2>② 商品リスト編集</h2>
       <table id="prodTable">
         <thead>
@@ -41,9 +163,9 @@
         </thead>
         <tbody></tbody>
       </table>
-      <button id="btnAdd">商品を追加</button>
+      <button id="btnAdd">＋ 商品を追加</button>
     </div>
-    <div>
+    <div class="panel">
       <h2>③ 生成コード</h2>
       <textarea id="output" readonly placeholder="OKボタンを押すとここに変更後のコードが表示されます"></textarea>
     </div>
@@ -57,7 +179,6 @@
 
     function parseProducts() {
       const code = document.getElementById('sourceCode').value;
-      // products 配列
       const reProd = /const\s+products\s*=\s*(\[[\s\S]*?\])\.slice/;
       const mProd = code.match(reProd);
       if (!mProd) {
@@ -69,7 +190,6 @@
       } catch (e) {
         alert('products 頭のパースに失敗：' + e.message);
       }
-      // recommendIDs の抽出
       const reRec = /const\s+RECOMMEND_IDS\s*=\s*\[([^\]]*)\]/;
       const mRec = code.match(reRec);
       if (mRec) {
@@ -80,7 +200,6 @@
       } else {
         recommendIDs = [];
       }
-      // 各 product に recommended プロパティを付与
       products.forEach(p => {
         p.recommended = recommendIDs.includes(p.id);
       });
@@ -104,7 +223,6 @@
       });
     }
 
-    // テーブル編集反映
     document.querySelector('#prodTable').addEventListener('input', e => {
       const idx = e.target.dataset.index;
       const field = e.target.dataset.field;
@@ -120,7 +238,6 @@
       }
     });
 
-    // 削除
     document.querySelector('#prodTable').addEventListener('click', e => {
       if (e.target.classList.contains('btnDel')) {
         products.splice(e.target.dataset.index, 1);
@@ -128,35 +245,24 @@
       }
     });
 
-    // 追加
     document.getElementById('btnAdd').addEventListener('click', () => {
       const maxId = products.reduce((m, p) => p.id > m ? p.id : m, 0);
       products.push({ id: maxId + 1, name: '', price: 0, stock: 0, image: '', recommended: false });
       renderTable();
     });
 
-    // OKボタン：コード生成（products更新＋RECOMMEND_IDS更新＋LOCAL_VERSION++＋timestampText更新）
     document.getElementById('btnOK').addEventListener('click', () => {
       let code = document.getElementById('sourceCode').value;
-
-      // products 配列置換
       const arrStr = JSON.stringify(products.map(({recommended, ...rest}) => rest), null, 2);
       code = code.replace(
         /const\s+products\s*=\s*\[[\s\S]*?\](\.slice\([\s\S]*?\);?)/,
         `const products = ${arrStr}$1`
       );
-
-      // RECOMMEND_IDS 更新
-      const newRecs = products
-        .filter(p => p.recommended)
-        .map(p => p.id)
-        .join(', ');
+      const newRecs = products.filter(p => p.recommended).map(p => p.id).join(', ');
       code = code.replace(
         /const\s+RECOMMEND_IDS\s*=\s*\[[^\]]*\];/,
         `const RECOMMEND_IDS = [${newRecs}];`
       );
-
-      // LOCAL_VERSION を +1
       const verMatch = code.match(/const\s+LOCAL_VERSION\s*=\s*(\d+);/);
       if (verMatch) {
         const newVer = parseInt(verMatch[1], 10) + 1;
@@ -165,8 +271,6 @@
           `const LOCAL_VERSION = ${newVer};`
         );
       }
-
-      // timestampText を現在日時に
       const now = new Date();
       const mm = now.getMonth() + 1;
       const dd = now.getDate();
@@ -177,11 +281,9 @@
         /const\s+timestampText\s*=\s*".*?";/,
         `const timestampText = "${ts}";`
       );
-
       document.getElementById('output').value = code;
     });
 
-    // 初期化：元コードを貼ったら即反映
     document.getElementById('sourceCode').addEventListener('change', () => {
       parseProducts();
       renderTable();
