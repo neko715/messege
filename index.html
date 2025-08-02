@@ -1,130 +1,190 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>手書きストックボード</title>
+  <meta charset="UTF-8">
+  <title>商品一覧コードエディタ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    html, body {
-      margin: 0;
-      padding: 0;
-      height: 100%;
-      overflow: hidden;
-      background-color: white;
-    }
-
-    canvas {
-      display: block;
-      background-color: white;
-      cursor: crosshair;
-    }
-
-    #enterBtn {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      padding: 12px 24px;
-      background-color: red;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
-      cursor: pointer;
-      z-index: 10;
-    }
-
-    #stockContainer {
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      z-index: 5;
-    }
-
-    .stockItem {
-      border: 1px solid #ccc;
-    }
+    body { font-family: sans-serif; padding: 20px; background: #f0f0f0; }
+    textarea { width: 100%; height: 200px; font-family: monospace; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; background: #fff; }
+    th, td { padding: 8px; border: 1px solid #ccc; text-align: center; }
+    input[type="text"], input[type="number"] { width: 100%; box-sizing: border-box; }
+    button { padding: 6px 12px; margin: 4px; }
+    #output { width: 100%; height: 300px; font-family: monospace; }
+    .flex { display: flex; gap: 20px; flex-wrap: wrap; }
+    .flex > div { flex: 1 1 400px; }
   </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
-  <div id="stockContainer"></div>
-  <button id="enterBtn">Enter</button>
+  <h1>商品一覧コードエディタ</h1>
+
+  <!-- 元コード入力 -->
+  <label>① ここに元のHTMLコードを貼り付け：</label>
+  <textarea id="sourceCode" placeholder="ここに元のHTMLを貼り付けてください"></textarea>
+
+  <!-- 編集用UI -->
+  <div class="flex">
+    <div>
+      <h2>② 商品リスト編集</h2>
+      <table id="prodTable">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>名前</th>
+            <th>価格</th>
+            <th>在庫</th>
+            <th>画像URL</th>
+            <th>おすすめ</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <button id="btnAdd">商品を追加</button>
+    </div>
+    <div>
+      <h2>③ 生成コード</h2>
+      <textarea id="output" readonly placeholder="OKボタンを押すとここに変更後のコードが表示されます"></textarea>
+    </div>
+  </div>
+
+  <button id="btnOK">OK：変更後コードを生成</button>
 
   <script>
-    const canvas = document.getElementById("canvas");
-    const ctx = canvas.getContext("2d");
-    const stockContainer = document.getElementById("stockContainer");
-    const enterBtn = document.getElementById("enterBtn");
+    let products = [];
+    let recommendIDs = [];
 
-    function resizeCanvas() {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
+    function parseProducts() {
+      const code = document.getElementById('sourceCode').value;
+      // products 配列
+      const reProd = /const\s+products\s*=\s*(\[[\s\S]*?\])\.slice/;
+      const mProd = code.match(reProd);
+      if (!mProd) {
+        alert('products 配列の検出に失敗しました。');
+        return;
+      }
+      try {
+        products = eval(mProd[1]);
+      } catch (e) {
+        alert('products 頭のパースに失敗：' + e.message);
+      }
+      // recommendIDs の抽出
+      const reRec = /const\s+RECOMMEND_IDS\s*=\s*\[([^\]]*)\]/;
+      const mRec = code.match(reRec);
+      if (mRec) {
+        recommendIDs = mRec[1]
+          .split(',')
+          .map(s => parseInt(s.trim(), 10))
+          .filter(n => !isNaN(n));
+      } else {
+        recommendIDs = [];
+      }
+      // 各 product に recommended プロパティを付与
+      products.forEach(p => {
+        p.recommended = recommendIDs.includes(p.id);
+      });
     }
 
-    window.addEventListener("resize", resizeCanvas);
-    resizeCanvas();
+    function renderTable() {
+      const tbody = document.querySelector('#prodTable tbody');
+      tbody.innerHTML = '';
+      products.forEach((p, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${p.id}</td>
+          <td><input type="text" value="${p.name}" data-field="name" data-index="${i}"></td>
+          <td><input type="number" value="${p.price}" data-field="price" data-index="${i}"></td>
+          <td><input type="number" value="${p.stock}" data-field="stock" data-index="${i}"></td>
+          <td><input type="text" value="${p.image}" data-field="image" data-index="${i}"></td>
+          <td><input type="checkbox" ${p.recommended ? 'checked' : ''} data-field="recommended" data-index="${i}"></td>
+          <td><button class="btnDel" data-index="${i}">削除</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
 
-    ctx.strokeStyle = "red";
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-
-    let isDrawing = false;
-
-    canvas.addEventListener("mousedown", (e) => {
-      isDrawing = true;
-      ctx.beginPath();
-      ctx.moveTo(e.offsetX, e.offsetY);
-    });
-
-    canvas.addEventListener("mousemove", (e) => {
-      if (isDrawing) {
-        ctx.lineTo(e.offsetX, e.offsetY);
-        ctx.stroke();
+    // テーブル編集反映
+    document.querySelector('#prodTable').addEventListener('input', e => {
+      const idx = e.target.dataset.index;
+      const field = e.target.dataset.field;
+      if (idx != null && field) {
+        if (field === 'recommended') {
+          products[idx].recommended = e.target.checked;
+        } else {
+          const val = (field === 'name' || field === 'image')
+            ? e.target.value
+            : parseInt(e.target.value, 10) || 0;
+          products[idx][field] = val;
+        }
       }
     });
 
-    canvas.addEventListener("mouseup", () => {
-      isDrawing = false;
+    // 削除
+    document.querySelector('#prodTable').addEventListener('click', e => {
+      if (e.target.classList.contains('btnDel')) {
+        products.splice(e.target.dataset.index, 1);
+        renderTable();
+      }
     });
 
-    canvas.addEventListener("mouseleave", () => {
-      isDrawing = false;
+    // 追加
+    document.getElementById('btnAdd').addEventListener('click', () => {
+      const maxId = products.reduce((m, p) => p.id > m ? p.id : m, 0);
+      products.push({ id: maxId + 1, name: '', price: 0, stock: 0, image: '', recommended: false });
+      renderTable();
     });
 
-    // タッチ対応
-    canvas.addEventListener("touchstart", (e) => {
-      e.preventDefault();
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      ctx.beginPath();
-      ctx.moveTo(touch.clientX - rect.left, touch.clientY - rect.top);
-      isDrawing = true;
+    // OKボタン：コード生成（products更新＋RECOMMEND_IDS更新＋LOCAL_VERSION++＋timestampText更新）
+    document.getElementById('btnOK').addEventListener('click', () => {
+      let code = document.getElementById('sourceCode').value;
+
+      // products 配列置換
+      const arrStr = JSON.stringify(products.map(({recommended, ...rest}) => rest), null, 2);
+      code = code.replace(
+        /const\s+products\s*=\s*\[[\s\S]*?\](\.slice\([\s\S]*?\);?)/,
+        `const products = ${arrStr}$1`
+      );
+
+      // RECOMMEND_IDS 更新
+      const newRecs = products
+        .filter(p => p.recommended)
+        .map(p => p.id)
+        .join(', ');
+      code = code.replace(
+        /const\s+RECOMMEND_IDS\s*=\s*\[[^\]]*\];/,
+        `const RECOMMEND_IDS = [${newRecs}];`
+      );
+
+      // LOCAL_VERSION を +1
+      const verMatch = code.match(/const\s+LOCAL_VERSION\s*=\s*(\d+);/);
+      if (verMatch) {
+        const newVer = parseInt(verMatch[1], 10) + 1;
+        code = code.replace(
+          /const\s+LOCAL_VERSION\s*=\s*\d+;/,
+          `const LOCAL_VERSION = ${newVer};`
+        );
+      }
+
+      // timestampText を現在日時に
+      const now = new Date();
+      const mm = now.getMonth() + 1;
+      const dd = now.getDate();
+      const hh = now.getHours();
+      const mi = String(now.getMinutes()).padStart(2, '0');
+      const ts = `${mm}/${dd} ${hh}:${mi}`;
+      code = code.replace(
+        /const\s+timestampText\s*=\s*".*?";/,
+        `const timestampText = "${ts}";`
+      );
+
+      document.getElementById('output').value = code;
     });
 
-    canvas.addEventListener("touchmove", (e) => {
-      e.preventDefault();
-      if (!isDrawing) return;
-      const touch = e.touches[0];
-      const rect = canvas.getBoundingClientRect();
-      ctx.lineTo(touch.clientX - rect.left, touch.clientY - rect.top);
-      ctx.stroke();
-    });
-
-    canvas.addEventListener("touchend", () => {
-      isDrawing = false;
-    });
-
-    // Enterボタンで保存＆クリア
-    enterBtn.addEventListener("click", () => {
-      const img = new Image();
-      img.src = canvas.toDataURL();
-      img.width = 100;
-      img.className = "stockItem";
-      stockContainer.appendChild(img);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // 初期化：元コードを貼ったら即反映
+    document.getElementById('sourceCode').addEventListener('change', () => {
+      parseProducts();
+      renderTable();
     });
   </script>
 </body>
